@@ -1,0 +1,3 @@
+#!/data/data/com.termux/files/usr/bin/env node
+import { runCli } from '../lib/commands.js';
+runCli(process.argv.slice(2));

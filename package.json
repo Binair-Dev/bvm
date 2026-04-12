@@ -1,0 +1,44 @@
+{
+  "name": "bvm-cli",
+  "version": "0.1.0",
+  "description": "bVM — Ubuntu Mobile Virtual Machines manager for Android Termux",
+  "main": "lib/commands.js",
+  "type": "module",
+  "bin": {
+    "bvm": "bin/bvm"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "keywords": [
+    "bvm",
+    "ubuntu",
+    "termux",
+    "android",
+    "vm",
+    "proot",
+    "virtual-machine"
+  ],
+  "author": "B_nair <van.bellinghen.brian@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Binair-Dev/bvm.git"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "os": [
+    "android",
+    "linux"
+  ],
+  "dependencies": {
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0"
+  }
+}

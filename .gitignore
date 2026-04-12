@@ -1,0 +1,22 @@
+node_modules/
+*.log
+.DS_Store
+.env
+.env.local
+*.tgz
+coverage/
+.nyc_output/
+
+# Android signing & builds
+flutter_app/android/key.properties
+*.jks
+*.keystore
+*.apk
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/ios/Pods/
+flutter_app/macos/Pods/
+flutter_app/linux/flutter/
+flutter_app/windows/flutter/
