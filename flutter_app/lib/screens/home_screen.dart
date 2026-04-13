@@ -5,6 +5,7 @@ import '../constants.dart';
 import 'terminal_screen.dart';
 import 'vm_create_screen.dart';
 import 'settings_screen.dart';
+import 'port_forwards_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -126,6 +127,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        IconButton(
+                          icon: const Icon(Icons.router),
+                          tooltip: 'Port forwards',
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PortForwardsScreen(vmName: vm.name),
+                            ),
+                          ),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.terminal),
                           tooltip: 'Open terminal',

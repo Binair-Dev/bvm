@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'providers/vm_list_provider.dart';
 import 'providers/vm_setup_provider.dart';
+import 'providers/port_forward_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/setup_screen.dart';
 import 'services/native_bridge.dart';
@@ -34,6 +35,7 @@ class BvmApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => VmListProvider()),
         ChangeNotifierProvider(create: (_) => VmSetupProvider()),
+        ChangeNotifierProvider(create: (_) => PortForwardProvider()),
       ],
       child: MaterialApp(
         title: 'bVM',

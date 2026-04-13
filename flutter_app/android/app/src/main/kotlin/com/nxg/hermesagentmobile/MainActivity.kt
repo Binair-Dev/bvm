@@ -38,6 +38,7 @@ class MainActivity : FlutterActivity() {
 
     private lateinit var bootstrapManager: BootstrapManager
     private lateinit var processManager: ProcessManager
+    private val portForwardManager = PortForwardManager()
     private var setupDone = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -115,6 +116,7 @@ class MainActivity : FlutterActivity() {
                     if (name != null) {
                         Thread {
                             try {
+                                portForwardManager.stopForwardsByVm(name)
                                 val ok = bootstrapManager.deleteRootfs(name)
                                 runOnUiThread { result.success(ok) }
                             } catch (e: Exception) {
@@ -437,6 +439,54 @@ class MainActivity : FlutterActivity() {
                         }
                     }.start()
                 }
+                "startPortForward" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    val vmPort = call.argument<Int>("vmPort") ?: 0
+                    val hostPort = call.argument<Int>("hostPort") ?: 0
+                    val bindAddress = call.argument<String>("bindAddress") ?: "127.0.0.1"
+                    if (vmName.isEmpty() || vmPort <= 0 || hostPort <= 0 || hostPort > 65535) {
+                        result.error("INVALID_ARGS", "Invalid port forward parameters", null)
+                    } else {
+                        val session = portForwardManager.startForward(vmName, vmPort, hostPort, bindAddress)
+                        if (session != null) {
+                            result.success(
+                                mapOf(
+                                    "id" to session.id,
+                                    "vmName" to session.vmName,
+                                    "vmPort" to session.vmPort,
+                                    "hostPort" to session.hostPort,
+                                    "bindAddress" to session.bindAddress
+                                )
+                            )
+                        } else {
+                            result.error("PORT_FORWARD_ERROR", "Failed to start port forward. Port may already be in use.", null)
+                        }
+                    }
+                }
+                "stopPortForward" -> {
+                    val id = call.argument<String>("id") ?: ""
+                    if (id.isEmpty()) {
+                        result.error("INVALID_ARGS", "id required", null)
+                    } else {
+                        val ok = portForwardManager.stopForward(id)
+                        result.success(ok)
+                    }
+                }
+                "listPortForwards" -> {
+                    val list = portForwardManager.listForwards().map {
+                        mapOf(
+                            "id" to it.id,
+                            "vmName" to it.vmName,
+                            "vmPort" to it.vmPort,
+                            "hostPort" to it.hostPort,
+                            "bindAddress" to it.bindAddress
+                        )
+                    }
+                    result.success(list)
+                }
+                "getLocalIpAddress" -> {
+                    result.success(getLocalIpAddress() ?: "")
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -452,6 +502,29 @@ class MainActivity : FlutterActivity() {
                 override fun onCancel(arguments: Any?) {}
             }
         )
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        portForwardManager.stopAllForwards()
+    }
+
+    private fun getLocalIpAddress(): String? {
+        try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                if (iface.isLoopback || !iface.isUp) continue
+                val addresses = iface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val addr = addresses.nextElement()
+                    if (addr is java.net.Inet4Address) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return null
     }
 
     private fun requestNotificationPermission() {

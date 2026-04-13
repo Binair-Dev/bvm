@@ -56,6 +56,34 @@ class NativeBridge {
     });
   }
 
+  static Future<Map<String, dynamic>> startPortForward({
+    required String vmName,
+    required int vmPort,
+    required int hostPort,
+    String bindAddress = '127.0.0.1',
+  }) async {
+    final result = await _channel.invokeMethod('startPortForward', {
+      'vmName': vmName,
+      'vmPort': vmPort,
+      'hostPort': hostPort,
+      'bindAddress': bindAddress,
+    });
+    return Map<String, dynamic>.from(result);
+  }
+
+  static Future<bool> stopPortForward(String id) async {
+    return await _channel.invokeMethod('stopPortForward', {'id': id});
+  }
+
+  static Future<List<Map<String, dynamic>>> listPortForwards() async {
+    final result = await _channel.invokeMethod<List>('listPortForwards');
+    return result?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  }
+
+  static Future<String> getLocalIpAddress() async {
+    return await _channel.invokeMethod('getLocalIpAddress') ?? '';
+  }
+
   static Future<bool> setupDirs() async {
     return await _channel.invokeMethod('setupDirs');
   }
