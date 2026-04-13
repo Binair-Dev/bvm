@@ -24,7 +24,8 @@ Each VM is a fully independent Ubuntu environment with its own filesystem, packa
 | Setup | One-tap Ubuntu base download | `bvm setup` |
 | Create VM | Tap "New VM" | `bvm create <name>` |
 | Terminal | Built-in `xterm` emulator | `bvm shell <name>` |
-| Manage | List / delete / open terminal | `bvm list / delete` |
+| Manage | List / delete / backup / share files | `bvm list / delete / backup` |
+| Presets | Create, export & import JSON presets | Manual install |
 
 ---
 
@@ -56,16 +57,21 @@ Access tools and libraries that simply don't exist on Android (e.g., `gcc`, `gdb
 ## Features
 
 ### Flutter App
-- **One-Tap Base Setup** — Downloads the official Ubuntu minimal rootfs (~300MB)
-- **Multi-VM Manager** — Create as many isolated Ubuntu VMs as your storage allows
+
+- **One-Tap Base Setup** — Downloads the official Ubuntu minimal rootfs (~300MB) automatically
+- **Multi-VM Manager** — Create, rename, delete, and list as many isolated Ubuntu VMs as your storage allows
+- **VM Presets** — Automate VM setup with reusable command presets. Export presets as JSON and share them with the community, or import presets from others
 - **Built-in Terminal** — Full `xterm-256color` emulator with extra keys toolbar, copy/paste, clickable URLs
-- **Foreground Service** — Keeps terminal sessions alive in the background
-- **Zero Root Required** — Everything runs inside `proot`, safely and securely
+- **File Sharing** — Push and pull files between Android and any VM via the shared `/mnt/shared` directory
+- **VM Backup & Restore** — Create and restore full VM snapshots so you never lose your work
+- **Foreground Service** — Keeps terminal sessions alive in the background even when the screen is off
+- **Zero Root Required** — Everything runs inside `proot`, safely and securely without unlocking your bootloader
 - **Battery & Storage Helpers** — In-app guidance for permissions and optimization
 
 ### Termux CLI
+
 - **One-Command Setup** — Installs `proot-distro`, downloads Ubuntu, and prepares the CLI
-- **Multi-VM Commands** — `create`, `delete`, `list`, `shell`, `exec`
+- **Multi-VM Commands** — `create`, `delete`, `list`, `shell`, `exec`, `backup`, `restore`
 - **Lightweight** — Written in pure Node.js, no heavy dependencies
 
 ---
@@ -78,7 +84,10 @@ Access tools and libraries that simply don't exist on Android (e.g., `gcc`, `gdb
 2. Install it on your Android 10+ device
 3. Open the app and tap **Install Ubuntu Base**
 4. Tap **+ New VM** to create your first VM
+   - Choose the **Minimal Ubuntu** preset (or import a custom preset)
+   - Wait for the setup to complete
 5. Tap the VM card to open the terminal
+6. **(Optional)** Tap **Files** to push/pull files with the VM
 
 Or build from source:
 
@@ -130,6 +139,31 @@ bvm delete devbox --yes
 
 ---
 
+## Presets — Automate Your VM Setup
+
+bVM lets you define **presets**: reusable lists of shell commands that run automatically when a VM is created.
+
+### Built-in Preset
+- **Minimal Ubuntu** — Clean Ubuntu with curl, wget, vim, and nano
+
+### Custom Presets
+Create your own presets in the app, then:
+- **Export** — Tap the copy icon to copy the preset JSON to your clipboard
+- **Import** — Tap the download icon and paste a preset JSON to add it instantly
+
+This makes it easy to share dev environments, security toolkits, or AI agent setups with friends or across your devices.
+
+---
+
+## File Sharing
+
+Every VM has access to a shared directory mounted at `/mnt/shared`. This directory is synced with Android, so you can:
+- Push files from Android into the VM
+- Pull files generated inside the VM back to Android
+- Share data between multiple VMs using the same shared space
+
+---
+
 ## Requirements
 
 | Requirement | Details |
@@ -147,8 +181,12 @@ bvm delete devbox --yes
 ┌─────────────────────────────────────────────────────────────┐
 │                    Flutter App (Dart)                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │  VM Manager  │  │   Terminal   │  │   Settings   │       │
-│  │ (create/list)│  │  (xterm emu) │  │(permissions) │       │
+│  │  VM Manager  │  │   Terminal   │  │   Presets    │       │
+│  │ (create/list)│  │  (xterm emu) │  │(export/import)│      │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │ File Sharing │  │ VM Backup    │  │   Settings   │       │
+│  │(push/pull)   │  │(snapshots)   │  │(permissions) │       │
 │  └──────────────┘  └──────────────┘  └──────────────┘       │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -156,6 +194,7 @@ bvm delete devbox --yes
                             │
 ┌─────────────────────────────────────────────────────────────┐
 │              BootstrapManager + ProcessManager              │
+│              FileSharingManager + VmBackupManager           │
 │              (proot binary + rootfs handling)               │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -171,6 +210,7 @@ bvm delete devbox --yes
 ┌─────────────────────────────────────────────────────────────┐
 │              VM Instances (devbox, homelab, ...)            │
 │         (independent copies with full apt access)           │
+│              + /mnt/shared for file exchange                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -183,6 +223,11 @@ bvm/
 ├── flutter_app/              # Flutter application
 │   ├── android/              # Kotlin native layer (proot bridge)
 │   ├── lib/                  # Dart UI + providers + services
+│   │   ├── models/           # Preset, VM models
+│   │   ├── providers/        # State management (VM, preset, file sharing)
+│   │   ├── screens/          # UI screens (terminal, presets, files)
+│   │   ├── services/         # Native bridge, file sharing
+│   │   └── widgets/          # Reusable UI components
 │   ├── assets/               # Icons & fonts
 │   └── pubspec.yaml
 ├── bin/                      # CLI entrypoints
