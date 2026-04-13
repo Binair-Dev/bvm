@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/vm_list_provider.dart';
+import '../providers/backup_provider.dart';
 import '../constants.dart';
+import '../widgets/backup_progress_dialog.dart';
 import 'terminal_screen.dart';
 import 'vm_create_screen.dart';
 import 'settings_screen.dart';
@@ -56,6 +58,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _backupVm(BuildContext context, String vmName) async {
+    final provider = context.read<BackupProvider>();
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BackupProgressDialog(
+        title: 'Backing up $vmName',
+        onStart: (onProgress) async {
+          final result = await provider.exportVm(vmName, onProgress);
+          return result;
+        },
+      ),
+    );
+    if (context.mounted && ok == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup of "$vmName" saved')),
+      );
+    } else if (context.mounted && ok == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup failed: ${provider.error}')),
+      );
+    }
+  }
+
+  Future<void> _importVm(BuildContext context) async {
+    final provider = context.read<BackupProvider>();
+    final vmName = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BackupProgressDialog(
+        title: 'Importing VM',
+        onStart: (onProgress) => provider.importVm(onProgress),
+      ),
+    );
+    if (context.mounted && vmName != null) {
+      context.read<VmListProvider>().loadVms();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('VM imported as "$vmName"')),
+      );
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Import failed: ${provider.error}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -64,6 +112,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text(AppConstants.appName),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: 'Import VM',
+            onPressed: () => _importVm(context),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.of(context).push(
@@ -124,31 +177,54 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     title: Text(vm.name),
                     subtitle: Text('${vm.size} • Created ${vm.createdAt.toLocal().toString().split(' ').first}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.router),
-                          tooltip: 'Port forwards',
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => PortForwardsScreen(vmName: vm.name),
-                            ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'ports':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PortForwardsScreen(vmName: vm.name),
+                              ),
+                            );
+                            break;
+                          case 'backup':
+                            _backupVm(context, vm.name);
+                            break;
+                          case 'delete':
+                            _confirmDelete(context, vm);
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'ports',
+                          child: Row(
+                            children: [
+                              Icon(Icons.router, size: 20),
+                              SizedBox(width: 8),
+                              Text('Port forwards'),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.terminal),
-                          tooltip: 'Open terminal',
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => TerminalScreen(vmName: vm.name),
-                            ),
+                        const PopupMenuItem(
+                          value: 'backup',
+                          child: Row(
+                            children: [
+                              Icon(Icons.save_alt, size: 20),
+                              SizedBox(width: 8),
+                              Text('Backup'),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          tooltip: 'Delete VM',
-                          onPressed: () => _confirmDelete(context, vm),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 20, color: theme.colorScheme.error),
+                              const SizedBox(width: 8),
+                              Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
+                            ],
+                          ),
                         ),
                       ],
                     ),

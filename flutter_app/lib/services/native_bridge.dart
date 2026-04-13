@@ -84,6 +84,16 @@ class NativeBridge {
     return await _channel.invokeMethod('getLocalIpAddress') ?? '';
   }
 
+  static Future<Map<String, dynamic>> exportVm(String vmName) async {
+    final result = await _channel.invokeMethod('exportVm', {'vmName': vmName});
+    return Map<String, dynamic>.from(result);
+  }
+
+  static Future<Map<String, dynamic>> importVm() async {
+    final result = await _channel.invokeMethod('importVm');
+    return Map<String, dynamic>.from(result);
+  }
+
   static Future<bool> setupDirs() async {
     return await _channel.invokeMethod('setupDirs');
   }

@@ -35,11 +35,20 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.bvm.mobile/native"
     private val EVENT_CHANNEL = "com.bvm.mobile/events"
+    private val EXPORT_REQUEST_CODE = 1001
+    private val IMPORT_REQUEST_CODE = 1002
 
     private lateinit var bootstrapManager: BootstrapManager
     private lateinit var processManager: ProcessManager
+    private lateinit var backupManager: VmBackupManager
     private val portForwardManager = PortForwardManager()
     private var setupDone = false
+
+    private var pendingExportResult: MethodChannel.Result? = null
+    private var pendingExportVmName: String? = null
+    private var pendingImportResult: MethodChannel.Result? = null
+
+    private var backupEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -49,6 +58,7 @@ class MainActivity : FlutterActivity() {
 
         bootstrapManager = BootstrapManager(applicationContext, filesDir, nativeLibDir)
         processManager = ProcessManager(filesDir, nativeLibDir)
+        backupManager = VmBackupManager(applicationContext)
 
         if (!setupDone) {
             setupDone = true
@@ -487,6 +497,29 @@ class MainActivity : FlutterActivity() {
                 "getLocalIpAddress" -> {
                     result.success(getLocalIpAddress() ?: "")
                 }
+                "exportVm" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    if (vmName.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmName required", null)
+                    } else {
+                        pendingExportResult = result
+                        pendingExportVmName = vmName
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "application/gzip"
+                            putExtra(Intent.EXTRA_TITLE, "bvm-${vmName}-${System.currentTimeMillis()}.tar.gz")
+                        }
+                        startActivityForResult(intent, EXPORT_REQUEST_CODE)
+                    }
+                }
+                "importVm" -> {
+                    pendingImportResult = result
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/gzip"
+                    }
+                    startActivityForResult(intent, IMPORT_REQUEST_CODE)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -495,6 +528,18 @@ class MainActivity : FlutterActivity() {
 
         createUrlNotificationChannel()
         requestNotificationPermission()
+
+        val backupEventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.bvm.mobile/backup_events")
+        backupEventChannel.setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    backupEventSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    backupEventSink = null
+                }
+            }
+        )
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
@@ -507,6 +552,77 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         super.onDestroy()
         portForwardManager.stopAllForwards()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+                EXPORT_REQUEST_CODE -> {
+                val vmName = pendingExportVmName
+                val pending = pendingExportResult
+                val uri = data?.data
+                if (resultCode != Activity.RESULT_OK || uri == null || vmName == null || pending == null) {
+                    pending?.error("CANCELLED", "User cancelled export", null)
+                } else {
+                    backupManager.exportVm(vmName, uri,
+                        progressCallback = { progress ->
+                            runOnUiThread {
+                                backupEventSink?.success(mapOf(
+                                    "type" to "progress",
+                                    "current" to progress.current,
+                                    "total" to progress.total,
+                                    "message" to progress.message
+                                ))
+                            }
+                        }
+                    ) { success, error ->
+                        runOnUiThread {
+                            if (success) {
+                                backupEventSink?.success(mapOf("type" to "complete"))
+                                pending.success(mapOf("success" to true, "uri" to uri.toString()))
+                            } else {
+                                backupEventSink?.success(mapOf("type" to "error", "message" to (error ?: "Export failed")))
+                                pending.error("EXPORT_ERROR", error ?: "Export failed", null)
+                            }
+                        }
+                    }
+                }
+                pendingExportResult = null
+                pendingExportVmName = null
+            }
+            IMPORT_REQUEST_CODE -> {
+                val pending = pendingImportResult
+                val uri = data?.data
+                if (resultCode != Activity.RESULT_OK || uri == null || pending == null) {
+                    pending?.error("CANCELLED", "User cancelled import", null)
+                } else {
+                    val vmName = "imported-${System.currentTimeMillis()}"
+                    backupManager.importVm(uri, vmName,
+                        progressCallback = { progress ->
+                            runOnUiThread {
+                                backupEventSink?.success(mapOf(
+                                    "type" to "progress",
+                                    "current" to progress.current,
+                                    "total" to progress.total,
+                                    "message" to progress.message
+                                ))
+                            }
+                        }
+                    ) { success, error ->
+                        runOnUiThread {
+                            if (success) {
+                                backupEventSink?.success(mapOf("type" to "complete"))
+                                pending.success(mapOf("success" to true, "vmName" to vmName))
+                            } else {
+                                backupEventSink?.success(mapOf("type" to "error", "message" to (error ?: "Import failed")))
+                                pending.error("IMPORT_ERROR", error ?: "Import failed", null)
+                            }
+                        }
+                    }
+                }
+                pendingImportResult = null
+            }
+        }
     }
 
     private fun getLocalIpAddress(): String? {
