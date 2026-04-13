@@ -9,6 +9,7 @@ import 'vm_create_screen.dart';
 import 'settings_screen.dart';
 import 'port_forwards_screen.dart';
 import 'vm_files_screen.dart';
+import 'vm_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -172,12 +173,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 final vm = provider.vms[index];
                 return Card(
                   child: ListTile(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => VmDetailScreen(vmName: vm.name),
+                        ),
+                      );
+                    },
                     leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primary,
-                      child: const Icon(Icons.terminal, color: Colors.white),
+                      backgroundColor: vm.isRunning ? Colors.green : theme.colorScheme.primary,
+                      child: Icon(
+                        vm.isRunning ? Icons.play_arrow : Icons.stop,
+                        color: Colors.white,
+                      ),
                     ),
                     title: Text(vm.name),
-                    subtitle: Text('${vm.size} • Created ${vm.createdAt.toLocal().toString().split(' ').first}'),
+                    subtitle: Row(
+                      children: [
+                        Text('${vm.size}'),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: vm.isRunning ? Colors.green : Colors.grey,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(vm.isRunning ? 'Running' : 'Stopped'),
+                      ],
+                    ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) {
                         switch (value) {
@@ -245,11 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => TerminalScreen(vmName: vm.name),
-                      ),
                     ),
                   ),
                 );

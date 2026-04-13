@@ -21,6 +21,7 @@ class BootstrapManager(
     private val homeDir get() = "$filesDir/home"
     private val configDir get() = "$filesDir/config"
     private val libDir get() = "$filesDir/lib"
+    private val stateManager = VmStateManager(filesDir)
 
     fun setupDirectories() {
         listOf(rootfsDir, tmpDir, homeDir, configDir, libDir).forEach {
@@ -225,13 +226,35 @@ class BootstrapManager(
             ?.sortedBy { it.name }
             ?.map { f ->
                 val size = folderSize(f)
+                val isRunning = stateManager.isRunning(f.name)
+                val autoStart = stateManager.getAutoStart(f.name)
                 mapOf(
                     "name" to f.name,
                     "createdAt" to java.util.Date(f.lastModified()).toString(),
                     "distro" to "ubuntu",
-                    "size" to formatBytes(size)
+                    "size" to formatBytes(size),
+                    "isRunning" to isRunning.toString(),
+                    "autoStart" to autoStart.toString(),
                 )
             } ?: emptyList()
+    }
+
+    fun startVm(vmName: String): Boolean {
+        val rootfs = File("$filesDir/rootfs/$vmName")
+        if (!rootfs.exists()) return false
+        stateManager.setRunning(vmName, true)
+        return true
+    }
+
+    fun stopVm(vmName: String): Boolean {
+        return stateManager.stopVm(vmName)
+    }
+
+    fun setVmAutoStart(vmName: String, autoStart: Boolean): Boolean {
+        val rootfs = File("$filesDir/rootfs/$vmName")
+        if (!rootfs.exists()) return false
+        stateManager.setAutoStart(vmName, autoStart)
+        return true
     }
 
     private fun copyDirectory(source: File, target: File) {

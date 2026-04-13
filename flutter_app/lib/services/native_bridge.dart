@@ -48,6 +48,21 @@ class NativeBridge {
     return result?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
   }
 
+  static Future<bool> vmStart(String name) async {
+    return await _channel.invokeMethod('vmStart', {'name': name});
+  }
+
+  static Future<bool> vmStop(String name) async {
+    return await _channel.invokeMethod('vmStop', {'name': name});
+  }
+
+  static Future<bool> vmSetAutoStart(String name, bool autoStart) async {
+    return await _channel.invokeMethod('vmSetAutoStart', {
+      'name': name,
+      'autoStart': autoStart,
+    });
+  }
+
   static Future<String> runInProot(String command, {int timeout = 900, String vmName = 'ubuntu'}) async {
     return await _channel.invokeMethod('runInProot', {
       'command': command,

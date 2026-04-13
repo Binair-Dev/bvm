@@ -157,6 +157,52 @@ class MainActivity : FlutterActivity() {
                         }
                     }.start()
                 }
+                "vmStart" -> {
+                    val name = call.argument<String>("name")
+                    if (name != null) {
+                        Thread {
+                            try {
+                                val ok = bootstrapManager.startVm(name)
+                                runOnUiThread { result.success(ok) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("VM_START_ERROR", e.message, null) }
+                            }
+                        }.start()
+                    } else {
+                        result.error("INVALID_ARGS", "name required", null)
+                    }
+                }
+                "vmStop" -> {
+                    val name = call.argument<String>("name")
+                    if (name != null) {
+                        Thread {
+                            try {
+                                val ok = bootstrapManager.stopVm(name)
+                                runOnUiThread { result.success(ok) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("VM_STOP_ERROR", e.message, null) }
+                            }
+                        }.start()
+                    } else {
+                        result.error("INVALID_ARGS", "name required", null)
+                    }
+                }
+                "vmSetAutoStart" -> {
+                    val name = call.argument<String>("name")
+                    val autoStart = call.argument<Boolean>("autoStart")
+                    if (name != null && autoStart != null) {
+                        Thread {
+                            try {
+                                val ok = bootstrapManager.setVmAutoStart(name, autoStart)
+                                runOnUiThread { result.success(ok) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("VM_AUTOSTART_ERROR", e.message, null) }
+                            }
+                        }.start()
+                    } else {
+                        result.error("INVALID_ARGS", "name and autoStart required", null)
+                    }
+                }
                 "runInProot" -> {
                     val command = call.argument<String>("command")
                     val timeout = call.argument<Int>("timeout")?.toLong() ?: 900L
