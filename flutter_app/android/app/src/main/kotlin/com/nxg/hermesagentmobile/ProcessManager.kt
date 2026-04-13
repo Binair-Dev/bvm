@@ -83,7 +83,10 @@ class ProcessManager(
             "--bind=$sysFakes/empty:/sys/fs/selinux",
             "--bind=$configDir/resolv.conf:/etc/resolv.conf",
             "--bind=$homeDir:/root/home",
+            "--bind=$filesDir/shared/$vmName:/mnt/shared",
         ).let { flags ->
+            // Ensure shared directory exists before proot bind
+            File("$filesDir/shared/$vmName").mkdirs()
             val hasAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Environment.isExternalStorageManager()
             } else {

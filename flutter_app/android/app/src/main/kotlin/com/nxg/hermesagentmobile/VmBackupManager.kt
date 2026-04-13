@@ -131,6 +131,11 @@ class VmBackupManager(private val context: Context) {
 
                 progressCallback?.invoke(Progress(100, 100, "Done!"))
                 callback(true, null)
+                
+                // Setup shared directory symlink for imported VM
+                try {
+                    FileSharingManager(context).setupSharedDir(vmName)
+                } catch (_: Exception) {}
             } catch (e: Exception) {
                 callback(false, e.message)
             }

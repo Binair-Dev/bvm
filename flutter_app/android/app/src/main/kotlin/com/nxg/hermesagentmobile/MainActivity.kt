@@ -37,16 +37,25 @@ class MainActivity : FlutterActivity() {
     private val EVENT_CHANNEL = "com.bvm.mobile/events"
     private val EXPORT_REQUEST_CODE = 1001
     private val IMPORT_REQUEST_CODE = 1002
+    private val UPLOAD_REQUEST_CODE = 1003
+    private val DOWNLOAD_REQUEST_CODE = 1004
 
     private lateinit var bootstrapManager: BootstrapManager
     private lateinit var processManager: ProcessManager
     private lateinit var backupManager: VmBackupManager
+    private lateinit var fileSharingManager: FileSharingManager
     private val portForwardManager = PortForwardManager()
     private var setupDone = false
+    private var nativeLibDir: String = ""
 
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingExportVmName: String? = null
     private var pendingImportResult: MethodChannel.Result? = null
+    private var pendingUploadResult: MethodChannel.Result? = null
+    private var pendingUploadVmName: String? = null
+    private var pendingDownloadResult: MethodChannel.Result? = null
+    private var pendingDownloadVmPath: String? = null
+    private var pendingDownloadIsDir: Boolean = false
 
     private var backupEventSink: EventChannel.EventSink? = null
 
@@ -54,11 +63,12 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
 
         val filesDir = applicationContext.filesDir.absolutePath
-        val nativeLibDir = applicationContext.applicationInfo.nativeLibraryDir
+        nativeLibDir = applicationContext.applicationInfo.nativeLibraryDir
 
         bootstrapManager = BootstrapManager(applicationContext, filesDir, nativeLibDir)
         processManager = ProcessManager(filesDir, nativeLibDir)
         backupManager = VmBackupManager(applicationContext)
+        fileSharingManager = FileSharingManager(applicationContext, processManager)
 
         if (!setupDone) {
             setupDone = true
@@ -520,6 +530,91 @@ class MainActivity : FlutterActivity() {
                     }
                     startActivityForResult(intent, IMPORT_REQUEST_CODE)
                 }
+                "setupSharedDir" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    if (vmName.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmName required", null)
+                    } else {
+                        fileSharingManager.setupSharedDir(vmName)
+                        result.success(true)
+                    }
+                }
+                "listSharedFiles" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    if (vmName.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmName required", null)
+                    } else {
+                        val files = fileSharingManager.listSharedFiles(vmName)
+                        result.success(files.map {
+                            mapOf(
+                                "name" to it.name,
+                                "path" to it.path,
+                                "isDirectory" to it.isDirectory,
+                                "size" to it.size,
+                                "permissions" to it.permissions,
+                                "lastModified" to it.lastModified
+                            )
+                        })
+                    }
+                }
+                "listVmDirectory" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    val path = call.argument<String>("path") ?: "/"
+                    if (vmName.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmName required", null)
+                    } else {
+                        fileSharingManager.listVmDirectory(vmName, path, nativeLibDir) { files, error ->
+                            runOnUiThread {
+                                if (error != null) {
+                                    result.error("LIST_ERROR", error, null)
+                                } else {
+                                    result.success(files?.map {
+                                        mapOf(
+                                            "name" to it.name,
+                                            "path" to it.path,
+                                            "isDirectory" to it.isDirectory,
+                                            "size" to it.size,
+                                            "permissions" to it.permissions,
+                                            "lastModified" to it.lastModified
+                                        )
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+                "uploadFileToVm" -> {
+                    val vmName = call.argument<String>("vmName") ?: ""
+                    if (vmName.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmName required", null)
+                    } else {
+                        pendingUploadResult = result
+                        pendingUploadVmName = vmName
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                        }
+                        startActivityForResult(intent, UPLOAD_REQUEST_CODE)
+                    }
+                }
+                "downloadFileFromVm" -> {
+                    val vmPath = call.argument<String>("vmPath") ?: ""
+                    val suggestedName = call.argument<String>("suggestedName") ?: "download"
+                    val isDirectory = call.argument<Boolean>("isDirectory") ?: false
+                    if (vmPath.isEmpty()) {
+                        result.error("INVALID_ARGS", "vmPath required", null)
+                    } else {
+                        pendingDownloadResult = result
+                        pendingDownloadVmPath = vmPath
+                        pendingDownloadIsDir = isDirectory
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = if (isDirectory) "application/zip" else "*/*"
+                            putExtra(Intent.EXTRA_TITLE, suggestedName)
+                        }
+                        startActivityForResult(intent, DOWNLOAD_REQUEST_CODE)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -622,7 +717,76 @@ class MainActivity : FlutterActivity() {
                 }
                 pendingImportResult = null
             }
+            UPLOAD_REQUEST_CODE -> {
+                val pending = pendingUploadResult
+                val vmName = pendingUploadVmName
+                val uri = data?.data
+                if (resultCode != Activity.RESULT_OK || uri == null || vmName == null || pending == null) {
+                    pending?.error("CANCELLED", "User cancelled upload", null)
+                } else {
+                    val fileName = getFileNameFromUri(uri)
+                    Thread {
+                        val success = fileSharingManager.copyToShared(vmName, uri, fileName)
+                        runOnUiThread {
+                            if (success) {
+                                pending.success(mapOf("success" to true, "fileName" to fileName))
+                            } else {
+                                pending.error("UPLOAD_ERROR", "Failed to upload file", null)
+                            }
+                        }
+                    }.start()
+                }
+                pendingUploadResult = null
+                pendingUploadVmName = null
+            }
+            DOWNLOAD_REQUEST_CODE -> {
+                val pending = pendingDownloadResult
+                val uri = data?.data
+                val vmPath = pendingDownloadVmPath
+                val isDir = pendingDownloadIsDir
+                if (resultCode != Activity.RESULT_OK || uri == null || vmPath == null || pending == null) {
+                    pending?.error("CANCELLED", "User cancelled download", null)
+                } else {
+                    val vmName = vmPath.split("/").firstOrNull { it.isNotEmpty() } ?: "vm"
+                    if (isDir) {
+                        fileSharingManager.downloadDirectory(vmName, vmPath, uri, nativeLibDir) { success, error ->
+                            runOnUiThread {
+                                if (success) {
+                                    pending.success(mapOf("success" to true))
+                                } else {
+                                    pending.error("DOWNLOAD_ERROR", error ?: "Download failed", null)
+                                }
+                            }
+                        }
+                    } else {
+                        fileSharingManager.downloadFile(vmName, vmPath, uri, nativeLibDir) { success, error ->
+                            runOnUiThread {
+                                if (success) {
+                                    pending.success(mapOf("success" to true))
+                                } else {
+                                    pending.error("DOWNLOAD_ERROR", error ?: "Download failed", null)
+                                }
+                            }
+                        }
+                    }
+                }
+                pendingDownloadResult = null
+                pendingDownloadVmPath = null
+            }
         }
+    }
+
+    private fun getFileNameFromUri(uri: Uri): String {
+        var fileName = "uploaded_file"
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex != -1) {
+                    fileName = cursor.getString(nameIndex) ?: fileName
+                }
+            }
+        }
+        return fileName
     }
 
     private fun getLocalIpAddress(): String? {

@@ -19,6 +19,7 @@ dependencies:
   dio: ^5.4.0
   google_fonts: ^6.1.0
   uuid: ^4.2.0
+  flutter_highlight: ^0.7.0
 
 dependency_overrides:
   shared_preferences_android: 2.3.2

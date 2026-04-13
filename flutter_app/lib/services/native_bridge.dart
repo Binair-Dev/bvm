@@ -151,4 +151,33 @@ class NativeBridge {
       if (event is String) yield event;
     }
   }
+
+  // File sharing
+  static Future<bool> setupSharedDir(String vmName) async {
+    return await _channel.invokeMethod('setupSharedDir', {'vmName': vmName});
+  }
+
+  static Future<List<Map<String, dynamic>>> listSharedFiles(String vmName) async {
+    final result = await _channel.invokeMethod<List>('listSharedFiles', {'vmName': vmName});
+    return result?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  }
+
+  static Future<List<Map<String, dynamic>>> listVmDirectory(String vmName, String path) async {
+    final result = await _channel.invokeMethod<List>('listVmDirectory', {'vmName': vmName, 'path': path});
+    return result?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+  }
+
+  static Future<Map<String, dynamic>> uploadFileToVm(String vmName) async {
+    final result = await _channel.invokeMethod('uploadFileToVm', {'vmName': vmName});
+    return Map<String, dynamic>.from(result);
+  }
+
+  static Future<Map<String, dynamic>> downloadFileFromVm(String vmPath, String suggestedName, bool isDirectory) async {
+    final result = await _channel.invokeMethod('downloadFileFromVm', {
+      'vmPath': vmPath,
+      'suggestedName': suggestedName,
+      'isDirectory': isDirectory,
+    });
+    return Map<String, dynamic>.from(result);
+  }
 }

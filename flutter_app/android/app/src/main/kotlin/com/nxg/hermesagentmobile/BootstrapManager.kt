@@ -199,6 +199,8 @@ class BootstrapManager(
         dest.mkdirs()
         return try {
             copyDirectory(base, dest)
+            // Ensure shared directory exists for bind mount
+            File("$filesDir/shared/$vmName").mkdirs()
             true
         } catch (e: Exception) {
             deleteRecursively(dest)

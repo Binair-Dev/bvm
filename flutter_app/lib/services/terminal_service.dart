@@ -58,6 +58,10 @@ class TerminalService {
     final procFakes = '${config['configDir']}/proc_fakes';
     final sysFakes = '${config['configDir']}/sys_fakes';
     final rootfsDir = '${config['configDir']}/../rootfs/$vmName';
+    final sharedDir = '${config['configDir']}/../shared/$vmName';
+    
+    // Ensure shared directory exists
+    Directory(sharedDir).createSync(recursive: true);
 
     String machine = 'aarch64';
     final kernelRelease = '\\Linux\\localhost\\$_fakeKernelRelease'
@@ -92,6 +96,7 @@ class TerminalService {
       '--bind=$sysFakes/empty:/sys/fs/selinux',
       '--bind=${config['configDir']}/resolv.conf:/etc/resolv.conf',
       '--bind=${config['homeDir']}:/root/home',
+      '--bind=$sharedDir:/mnt/shared',
     ];
 
     if (config['storageGranted'] == 'true') {

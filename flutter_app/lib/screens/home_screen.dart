@@ -8,6 +8,7 @@ import 'terminal_screen.dart';
 import 'vm_create_screen.dart';
 import 'settings_screen.dart';
 import 'port_forwards_screen.dart';
+import 'vm_files_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -180,6 +181,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     trailing: PopupMenuButton<String>(
                       onSelected: (value) {
                         switch (value) {
+                          case 'files':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => VmFilesScreen(vmName: vm.name),
+                              ),
+                            );
+                            break;
                           case 'ports':
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -196,6 +204,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
                       },
                       itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'files',
+                          child: Row(
+                            children: [
+                              Icon(Icons.folder, size: 20),
+                              SizedBox(width: 8),
+                              Text('Files'),
+                            ],
+                          ),
+                        ),
                         const PopupMenuItem(
                           value: 'ports',
                           child: Row(
