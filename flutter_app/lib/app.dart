@@ -7,6 +7,7 @@ import 'providers/port_forward_provider.dart';
 import 'providers/backup_provider.dart';
 import 'providers/file_sharing_provider.dart';
 import 'providers/text_editor_provider.dart';
+import 'providers/preset_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/setup_screen.dart';
 import 'services/native_bridge.dart';
@@ -42,6 +43,7 @@ class BvmApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BackupProvider()),
         ChangeNotifierProvider(create: (_) => FileSharingProvider()),
         ChangeNotifierProvider(create: (_) => TextEditorProvider()),
+        ChangeNotifierProvider(create: (_) => PresetProvider()),
       ],
       child: MaterialApp(
         title: 'bVM',
